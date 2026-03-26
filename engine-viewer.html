@@ -154,6 +154,7 @@
   </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 // ── EARLY ERROR CAPTURE — fires before anything else ─────────────────────────
 // Catches JS errors, promise rejections, and resource load failures.
@@ -600,18 +601,13 @@ btnRight.addEventListener('click',   ()=>swapCam(1));
 btnInstall.addEventListener('click', installCam);
 
 // ── LOAD MODEL ───────────────────────────────────────────────────────────────
-function loadGLTFLoader(cb) {
-  const s=document.createElement('script');
-  s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
-  s.onload=cb;
-  s.onerror=()=>{
-    errorDetail.textContent='Failed to load GLTFLoader from CDN.';
+// GLTFLoader is loaded as a static script tag — call directly, no injection needed
+(function loadModel() {
+  if (!THREE.GLTFLoader) {
+    errorDetail.textContent = 'GLTFLoader did not load — check CDN connectivity.';
     errorMsg.classList.add('visible'); loaderEl.classList.add('hidden');
-  };
-  document.head.appendChild(s);
-}
-
-loadGLTFLoader(()=>{
+    return;
+  }
   const gltfLoader=new THREE.GLTFLoader();
   gltfLoader.load('6.2_cam.glb',
     gltf=>{
@@ -688,7 +684,7 @@ loadGLTFLoader(()=>{
       errorMsg.classList.add('visible'); loaderEl.classList.add('hidden');
     }
   );
-});
+})();
 
 // ── RENDER LOOP ──────────────────────────────────────────────────────────────
 let lastFrameTime=performance.now();
