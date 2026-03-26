@@ -155,6 +155,56 @@
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+// ── EARLY ERROR CAPTURE — fires before anything else ─────────────────────────
+// Catches JS errors, promise rejections, and resource load failures.
+// Writes directly to body so it shows even if our DOM isn't ready yet.
+(function() {
+  var errors = [];
+
+  function showDebug(msg) {
+    errors.push(msg);
+    var box = document.getElementById('_dbg');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = '_dbg';
+      box.style.cssText = [
+        'position:fixed','top:0','left:0','right:0','z-index:99999',
+        'background:#1a0000','color:#ff6b6b','font-family:monospace',
+        'font-size:13px','padding:12px 14px','max-height:50vh',
+        'overflow-y:auto','border-bottom:2px solid #ff0000',
+        'white-space:pre-wrap','word-break:break-all'
+      ].join(';');
+      // append as early as possible — body may not exist yet
+      var target = document.body || document.documentElement;
+      if (target) target.insertBefore(box, target.firstChild);
+      else document.addEventListener('DOMContentLoaded', function() {
+        document.body.insertBefore(box, document.body.firstChild);
+      });
+    }
+    box.textContent = '🚨 DEBUG ERRORS (' + errors.length + '):\n\n' + errors.join('\n\n');
+  }
+
+  window.onerror = function(msg, src, line, col, err) {
+    showDebug('[JS ERROR]\n' + msg + '\nat ' + src + ':' + line + ':' + col +
+              (err && err.stack ? '\n' + err.stack : ''));
+    return false;
+  };
+
+  window.onunhandledrejection = function(e) {
+    var reason = e.reason;
+    showDebug('[PROMISE REJECTION]\n' +
+              (reason && reason.stack ? reason.stack : String(reason)));
+  };
+
+  // Also catch failed script/resource loads
+  window.addEventListener('error', function(e) {
+    if (e.target && e.target !== window) {
+      showDebug('[RESOURCE LOAD FAIL]\n' +
+                (e.target.src || e.target.href || e.target.tagName));
+    }
+  }, true);
+})();
+
 // ── DOM ───────────────────────────────────────────────────────────────────────
 const canvas      = document.getElementById('three-canvas');
 const container   = document.getElementById('canvas-container');
