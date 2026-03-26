@@ -158,55 +158,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/meshoptimizer@0.18.1/meshopt_decoder.js"></script>
 <script>
-// ── EARLY ERROR CAPTURE — fires before anything else ─────────────────────────
-// Catches JS errors, promise rejections, and resource load failures.
-// Writes directly to body so it shows even if our DOM isn't ready yet.
-(function() {
-  var errors = [];
 
-  function showDebug(msg) {
-    errors.push(msg);
-    var box = document.getElementById('_dbg');
-    if (!box) {
-      box = document.createElement('div');
-      box.id = '_dbg';
-      box.style.cssText = [
-        'position:fixed','top:0','left:0','right:0','z-index:99999',
-        'background:#1a0000','color:#ff6b6b','font-family:monospace',
-        'font-size:13px','padding:12px 14px','max-height:50vh',
-        'overflow-y:auto','border-bottom:2px solid #ff0000',
-        'white-space:pre-wrap','word-break:break-all'
-      ].join(';');
-      // append as early as possible — body may not exist yet
-      var target = document.body || document.documentElement;
-      if (target) target.insertBefore(box, target.firstChild);
-      else document.addEventListener('DOMContentLoaded', function() {
-        document.body.insertBefore(box, document.body.firstChild);
-      });
-    }
-    box.textContent = '🚨 DEBUG ERRORS (' + errors.length + '):\n\n' + errors.join('\n\n');
-  }
-
-  window.onerror = function(msg, src, line, col, err) {
-    showDebug('[JS ERROR]\n' + msg + '\nat ' + src + ':' + line + ':' + col +
-              (err && err.stack ? '\n' + err.stack : ''));
-    return false;
-  };
-
-  window.onunhandledrejection = function(e) {
-    var reason = e.reason;
-    showDebug('[PROMISE REJECTION]\n' +
-              (reason && reason.stack ? reason.stack : String(reason)));
-  };
-
-  // Also catch failed script/resource loads
-  window.addEventListener('error', function(e) {
-    if (e.target && e.target !== window) {
-      showDebug('[RESOURCE LOAD FAIL]\n' +
-                (e.target.src || e.target.href || e.target.tagName));
-    }
-  }, true);
-})();
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
 const canvas      = document.getElementById('three-canvas');
@@ -462,11 +414,6 @@ const T_FADE=0.75, T_FASTENER=0.5, STAGGER=0.2;
 // ── DISASSEMBLY ──────────────────────────────────────────────────────────────
 function removeCam() {
   if(animRunning) return;
-  // Guard — parts may be null if compressed file renamed objects
-  if(!parts.cam || !parts.timingCover || !parts.pulleys || !parts.fasteners || !parts.waterPump) {
-    alert('Some parts were not found in the model. Check the green name list on screen.');
-    return;
-  }
   animRunning=true; lockUI();
   setStatus('Disassembling...');
 
@@ -674,15 +621,6 @@ btnInstall.addEventListener('click', installCam);
 
       scene.add(model);
       updateCamera();
-
-      // ── Dump all named objects to screen for debugging compressed file ──
-      const allNames = [];
-      model.traverse(c=>{ if(c.name) allNames.push(c.name); });
-      const nameBox = document.getElementById('_dbg') || document.createElement('div');
-      nameBox.id = '_dbg';
-      nameBox.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#001a00;color:#6eff6e;font-family:monospace;font-size:11px;padding:10px 12px;max-height:60vh;overflow-y:auto;border-bottom:2px solid #00ff00;white-space:pre-wrap;word-break:break-all';
-      nameBox.textContent = '📦 ALL OBJECT NAMES IN GLB (' + allNames.length + '):\n\n' + allNames.join('\n');
-      document.body.insertBefore(nameBox, document.body.firstChild);
 
       function findPart(name) {
         let found=null;
