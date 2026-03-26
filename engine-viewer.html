@@ -414,7 +414,8 @@ function removeCam() {
     tween(cam.position,{x:camOrigin.x,y:camOrigin.y,z:camOrigin.z+PULL_Z},T_CAM_PULL,0,()=>{
       setStatus('');
       animRunning=false;
-      camIndex=0; updateArrows();
+      // Don't reset camIndex — remember whichever cam is installed
+      updateArrows();
       showState('selector'); unlockSelector();
     });
   });
@@ -529,7 +530,7 @@ function doInstall() {
         tweenOpacity(fasteners,0,1,T_FASTENER,STAGGER,()=>{
           setStatus('');
           animRunning=false;
-          camIndex=0;
+          // camIndex stays as whatever was installed — remembered for next removal
           showState('idle');
           btnRemove.disabled=false;
         });
