@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Engine Viewer — Jailbreak Performance</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -12,10 +12,11 @@
     --text:#e8e8ec; --muted:#888890; --green:#3dba72;
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--bg); color:var(--text); font-family:'Barlow',sans-serif; height:100vh; overflow:hidden; display:flex; flex-direction:column; }
+  body { background:var(--bg); color:var(--text); font-family:'Barlow',sans-serif; height:100vh; height:100dvh; overflow:hidden; display:flex; flex-direction:column; }
   header {
     background:linear-gradient(180deg,#0a0a0c 0%,var(--bg) 100%);
     border-bottom:1px solid var(--border); padding:0 2.0rem;
+    padding-top: env(safe-area-inset-top);
     display:flex; align-items:center; justify-content:space-between;
     height:88px; flex-shrink:0; z-index:10;
   }
@@ -45,14 +46,14 @@
   .error-body { color:var(--muted); font-size:1.1rem; max-width:480px; line-height:1.6; }
   .error-code { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:0.92rem 1.4rem; font-family:monospace; font-size:0.98rem; color:var(--accent2); max-width:480px; word-break:break-all; }
   .info-panel {
-    position:absolute; bottom:7.0rem; left:2.0rem;
+    position:absolute; bottom:calc(7.5rem + env(safe-area-inset-bottom)); left:2.0rem;
     background:rgba(20,20,23,0.88); border:1px solid var(--border);
     border-radius:8px; padding:1.12rem 1.4rem; backdrop-filter:blur(8px); z-index:5;
   }
   .info-engine { font-family:'Bebas Neue',sans-serif; font-size:1.57rem; letter-spacing:0.08em; color:var(--text); line-height:1; }
   .info-sub { font-size:0.92rem; color:var(--muted); margin-top:0.34rem; font-family:'Barlow Condensed',sans-serif; letter-spacing:0.1em; text-transform:uppercase; }
   .controls-hint {
-    position:absolute; bottom:7.0rem; right:2.0rem;
+    position:absolute; bottom:calc(7.5rem + env(safe-area-inset-bottom)); right:2.0rem;
     background:rgba(20,20,23,0.88); border:1px solid var(--border);
     border-radius:8px; padding:0.92rem 1.12rem; backdrop-filter:blur(8px); z-index:5;
     font-family:'Barlow Condensed',sans-serif; font-size:0.97rem;
@@ -74,6 +75,9 @@
     border-top:1px solid var(--border);
     display:flex; align-items:center; justify-content:center;
     z-index:8; padding:0 1.12rem;
+    padding-bottom: env(safe-area-inset-bottom);
+    /* bump height to absorb safe area without squishing buttons */
+    min-height: calc(6.5rem + env(safe-area-inset-bottom));
   }
   #btn-remove {
     background:var(--accent); color:white; border:none;
