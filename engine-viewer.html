@@ -122,12 +122,12 @@
   </div>
   <div id="error-msg">
     <div class="error-title">Model Not Found</div>
-    <div class="error-body">Make sure <strong>6.2_cam.glb</strong> is in the same folder.</div>
+    <div class="error-body">Make sure <strong>_cam.glb</strong> is in the same folder.</div>
     <div class="error-code" id="error-detail"></div>
   </div>
   <div id="anim-status"></div>
   <div class="info-panel">
-    <div class="info-engine">6.2L HELLCAT HEMI V8</div>
+    <div class="info-engine">L HELLCAT HEMI V8</div>
     <div class="info-sub">Supercharged · Interactive Engine Viewer</div>
   </div>
   <div class="controls-hint">
@@ -621,7 +621,7 @@ function loadGLTFLoader(cb) {
 
 loadGLTFLoader(()=>{
   const gltfLoader=new THREE.GLTFLoader();
-  gltfLoader.load('https://github.com/adamhallmc/JBP/releases/download/assets/6.2_cam.glb',
+  gltfLoader.load('6.2_cam.glb',
     gltf=>{
       const model=gltf.scene;
       const box=new THREE.Box3().setFromObject(model);
