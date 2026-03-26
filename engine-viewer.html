@@ -126,7 +126,7 @@
   </div>
   <div id="error-msg">
     <div class="error-title">Model Not Found</div>
-    <div class="error-body">Make sure <strong>6.2_cam.glb</strong> is in the same folder.</div>
+    <div class="error-body">Make sure <strong>6.2_cam_compressed.glb</strong> is in the same folder.</div>
     <div class="error-code" id="error-detail"></div>
   </div>
   <div id="anim-status"></div>
@@ -155,6 +155,7 @@
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
 <script>
 // ── EARLY ERROR CAPTURE — fires before anything else ─────────────────────────
 // Catches JS errors, promise rejections, and resource load failures.
@@ -235,10 +236,35 @@ function updateArrows() {
 }
 
 // ── RENDERER ─────────────────────────────────────────────────────────────────
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// Detect iOS for conservative settings
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: !isIOS,      // disable antialias on iOS to reduce GPU memory
+    powerPreference: 'default',
+    failIfMajorPerformanceCaveat: false,
+  });
+} catch(e) {
+  errorDetail.textContent = 'WebGL context creation failed: ' + e.message;
+  errorMsg.classList.add('visible');
+  loaderEl.classList.add('hidden');
+  throw e;
+}
+
+// Handle WebGL context loss (iOS memory pressure kills the context)
+canvas.addEventListener('webglcontextlost', e => {
+  e.preventDefault();
+  errorDetail.textContent = 'WebGL context was lost — device may be low on GPU memory. Try closing other apps and reloading.';
+  errorMsg.classList.add('visible');
+  loaderEl.classList.add('hidden');
+}, false);
+
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isIOS ? 1.5 : 2));
+renderer.shadowMap.enabled = !isIOS;  // disable shadows on iOS entirely
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
@@ -246,14 +272,15 @@ renderer.toneMappingExposure = 1.15;
 // ── SCENE & CAMERA ───────────────────────────────────────────────────────────
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d0d0f);
-scene.fog = new THREE.Fog(0x0d0d0f, 10, 28);
+if (!isIOS) scene.fog = new THREE.Fog(0x0d0d0f, 10, 28);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100);
 
 // ── LIGHTING ─────────────────────────────────────────────────────────────────
 scene.add(new THREE.AmbientLight(0xffffff, 0.35));
 const keyLight = new THREE.DirectionalLight(0xfff0e0, 1.6);
-keyLight.position.set(4,6,3); keyLight.castShadow=true;
-keyLight.shadow.mapSize.width = keyLight.shadow.mapSize.height = 2048;
+keyLight.position.set(4,6,3);
+keyLight.castShadow = !isIOS;
+if (!isIOS) keyLight.shadow.mapSize.width = keyLight.shadow.mapSize.height = 1024;
 scene.add(keyLight);
 const fillLight = new THREE.DirectionalLight(0xd0e8ff, 0.5);
 fillLight.position.set(-4,2,-2); scene.add(fillLight);
@@ -608,8 +635,11 @@ btnInstall.addEventListener('click', installCam);
     errorMsg.classList.add('visible'); loaderEl.classList.add('hidden');
     return;
   }
-  const gltfLoader=new THREE.GLTFLoader();
-  gltfLoader.load('6.2_cam.glb',
+  const gltfLoader = new THREE.GLTFLoader();
+  const dracoLoader = new THREE.DRACOLoader();
+  dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
+  gltfLoader.setDRACOLoader(dracoLoader);
+  gltfLoader.load('6.2_cam_compressed.glb',
     gltf=>{
       const model=gltf.scene;
       const box=new THREE.Box3().setFromObject(model);
