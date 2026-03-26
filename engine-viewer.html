@@ -122,12 +122,12 @@
   </div>
   <div id="error-msg">
     <div class="error-title">Model Not Found</div>
-    <div class="error-body">Make sure <strong>_cam.glb</strong> is in the same folder.</div>
+    <div class="error-body">Make sure <strong>6.2_cam.glb</strong> is in the same folder.</div>
     <div class="error-code" id="error-detail"></div>
   </div>
   <div id="anim-status"></div>
   <div class="info-panel">
-    <div class="info-engine">L HELLCAT HEMI V8</div>
+    <div class="info-engine">6.2L HELLCAT HEMI V8</div>
     <div class="info-sub">Supercharged · Interactive Engine Viewer</div>
   </div>
   <div class="controls-hint">
@@ -352,52 +352,6 @@ function tickTweens(now) {
   for(let i=tweens.length-1;i>=0;i--) { if(tweens[i].done) tweens.splice(i,1); }
 }
 
-// ── SPIN SYSTEM — NO REPARENTING ─────────────────────────────────────────────
-// The cam never changes parent. Spin is applied as:
-//   cam.quaternion = baseQuat * spinDeltaQuat
-// where baseQuat is the cam's quaternion when it reached float position,
-// and spinDeltaQuat accumulates angle around camSpinAxis.
-// Stopping spin = stop incrementing angle. Reset = set angle to 0.
-// This completely avoids all parent transform and Euler/quaternion conflicts.
-
-let camSpinAxis   = new THREE.Vector3(1,0,0); // computed at load
-let camBaseQuat   = new THREE.Quaternion();   // cam's quat at float position
-let spinAngle     = 0;                        // accumulated radians
-let spinSpeed     = 0;                        // current rad/s
-let spinActive    = false;
-let spinProxy     = {v:0};                   // tweened for ramp up/down
-const SPIN_CRUISE = 1.2;                      // rad/s
-
-function startSpin(delay) {
-  spinActive = true;
-  // Cancel any running speed tween
-  tweens.forEach(t=>{ if(t.obj===spinProxy&&!t.done) t.done=true; });
-  spinProxy.v = spinSpeed; // start from current speed (may be 0)
-  tween(spinProxy,{v:SPIN_CRUISE},1.5,delay,null);
-}
-
-function stopSpin(onDone) {
-  // Cancel any running speed tween
-  tweens.forEach(t=>{ if(t.obj===spinProxy&&!t.done) t.done=true; });
-  const cur = spinProxy.v;
-  spinProxy.v = cur;
-  tween(spinProxy,{v:0},0.3,0,()=>{
-    spinActive=false;
-    spinSpeed=0;
-    spinProxy.v=0;
-    if(onDone) onDone();
-  });
-}
-
-function resetSpin() {
-  // Zero out accumulated rotation — restore cam to its base orientation
-  spinAngle  = 0;
-  spinSpeed  = 0;
-  spinProxy.v= 0;
-  spinActive = false;
-  if(parts.cam) parts.cam.quaternion.copy(camBaseQuat);
-}
-
 // ── STATUS & UI ──────────────────────────────────────────────────────────────
 function setStatus(msg) {
   animStatus.textContent=msg;
@@ -456,22 +410,12 @@ function removeCam() {
 
     setStatus('Removing camshaft...');
 
-    // Cam slides out on Z — stays in its original parent, no reparenting
+    // Cam slides out on Z — no rotation, no reparenting, ever
     tween(cam.position,{x:camOrigin.x,y:camOrigin.y,z:camOrigin.z+PULL_Z},T_CAM_PULL,0,()=>{
-
-      // ── Cam is at float position ──
-      // Capture the cam's quaternion RIGHT NOW as the base for spin
-      // The cam hasn't been rotated at all yet so this is clean
-      camBaseQuat.copy(cam.quaternion);
-      spinAngle = 0;
-
       setStatus('');
       animRunning=false;
       camIndex=0; updateArrows();
       showState('selector'); unlockSelector();
-
-      // Start spin ramp after 0.5s pause
-      startSpin(0.5);
     });
   });
 }
@@ -482,17 +426,13 @@ function swapCam(direction) {
   const newIndex=camIndex+direction;
   if(newIndex<0||newIndex>=CAM_LIST.length) return;
   animRunning=true; lockUI();
-  stopSpin(()=>doSwap(direction,newIndex));
+  doSwap(direction,newIndex);
 }
 
 function doSwap(direction,newIndex) {
   const cam=parts.cam;
 
-  // Reset accumulated spin — restore cam to base orientation before translating
-  resetSpin();
-
-  // Use stored origin coords — cam.position is in parent local space
-  // At float position the cam is at camOrigin.x/y with camOrigin.z + PULL_Z
+  // Float position in parent-local space
   const floatX = camOrigin.x;
   const floatY = camOrigin.y;
   const floatZ = camOrigin.z + PULL_Z;
@@ -500,37 +440,31 @@ function doSwap(direction,newIndex) {
   const exitX  = floatX + FLOAT_X * direction;
   const enterX = floatX - FLOAT_X * direction;
 
-  // Clone outgoing cam for exit — it will have identity-relative quaternion
-  // matching base orientation since we just called resetSpin()
+  // Clone outgoing cam — deep clone with own materials
   const outgoing = cam.clone(true);
   outgoing.traverse(child=>{
     if(child.isMesh&&child.material) child.material=child.material.clone();
   });
+  // Place clone at exact float position with same orientation as cam
   outgoing.position.set(floatX,floatY,floatZ);
-  outgoing.quaternion.copy(cam.quaternion); // same clean base quat
+  outgoing.quaternion.copy(cam.quaternion);
   scene.add(outgoing);
 
-  // Outgoing slides out and fades
+  // Outgoing clone slides out and fades
   tween(outgoing.position,{x:exitX,y:floatY,z:floatZ},T_CAM_FLOAT,0,null);
   tweenOpacity(outgoing,1,0,T_CAM_FLOAT,0,()=>scene.remove(outgoing));
 
-  // Real cam repositioned at enter side — same Y and Z, opposite X
-  // Quaternion stays as camBaseQuat (already restored by resetSpin)
+  // Real cam enters from opposite side — same quaternion, no rotation changes
   cam.position.set(enterX,floatY,floatZ);
   setOpacity(cam,0);
 
-  // Slide in and fade in simultaneously
+  // Slide in and fade in simultaneously with outgoing
   tween(cam.position,{x:floatX,y:floatY,z:floatZ},T_CAM_FLOAT,0,null);
   tweenOpacity(cam,0,1,T_CAM_FLOAT,0,()=>{
     camIndex=newIndex;
     camNameDisp.textContent=CAM_LIST[camIndex];
-
-    // Recapture base quat (same as before since we reset) and restart spin
-    camBaseQuat.copy(cam.quaternion);
-    spinAngle=0;
     animRunning=false;
     unlockSelector();
-    startSpin(0.3);
   });
 }
 
@@ -538,20 +472,16 @@ function doSwap(direction,newIndex) {
 function installCam() {
   if(animRunning) return;
   animRunning=true; lockUI();
-  stopSpin(()=>doInstall());
+  doInstall();
 }
 
 function doInstall() {
   setStatus('Installing '+CAM_LIST[camIndex]+'...');
   const cam=parts.cam;
-
-  // Reset spin rotation before sliding cam back in
-  resetSpin();
-
   const cover=parts.timingCover, pulleys=parts.pulleys;
   const fasteners=parts.fasteners, accessories=parts.accessories, waterPump=parts.waterPump;
 
-  // Cam slides straight back into block — same X and Y it left from
+  // Cam slides straight back into block — no rotation changes ever
   tween(cam.position,{x:camOrigin.x,y:camOrigin.y,z:camOrigin.z},T_CAM_PULL,0,()=>{
     setStatus('Sealing engine...');
 
@@ -675,16 +605,6 @@ loadGLTFLoader(()=>{
       if(parts.waterPump)   waterPumpOrigin = parts.waterPump.position.clone();
       parts.accessories.forEach(a=>accessoryOrigins.push({name:a.name,pos:a.position.clone()}));
 
-      // Compute cam spin axis from its local X (longest dimension) in world space
-      // Use getWorldQuaternion — handles parent scale correctly unlike extractRotation
-      const camWorldQuat = new THREE.Quaternion();
-      parts.cam.getWorldQuaternion(camWorldQuat);
-      camSpinAxis = new THREE.Vector3(1,0,0).applyQuaternion(camWorldQuat).normalize();
-      console.log('Cam spin axis:',camSpinAxis);
-
-      // Store cam's base quaternion at rest (used as spin origin)
-      camBaseQuat.copy(parts.cam.quaternion);
-
       if(parts.cam&&parts.timingCover) {
         btnRemove.disabled=false;
       } else {
@@ -709,32 +629,14 @@ loadGLTFLoader(()=>{
 });
 
 // ── RENDER LOOP ──────────────────────────────────────────────────────────────
-// Spin delta quaternion — reused each frame to avoid allocation
-const spinDeltaQuat = new THREE.Quaternion();
 let lastFrameTime=performance.now();
-
 function animate() {
   requestAnimationFrame(animate);
   const now=performance.now();
-  const dt=Math.min((now-lastFrameTime)/1000,0.05);
   lastFrameTime=now;
-
   tickTweens(now);
-
-  // Apply spin — compose base orientation with accumulated rotation
-  // The cam stays in its original parent — no reparenting ever
-  if(spinActive && parts.cam) {
-    spinSpeed = spinProxy.v;
-    spinAngle += spinSpeed * dt;
-    // Build delta quaternion for this accumulated angle around the spin axis
-    spinDeltaQuat.setFromAxisAngle(camSpinAxis, spinAngle);
-    // Apply: final = baseQuat * spinDelta
-    parts.cam.quaternion.multiplyQuaternions(camBaseQuat, spinDeltaQuat);
-  }
-
   renderer.render(scene,camera);
 }
-
 lastFrameTime=performance.now();
 animate();
 showState('idle');
