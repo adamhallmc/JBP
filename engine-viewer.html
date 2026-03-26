@@ -462,6 +462,11 @@ const T_FADE=0.75, T_FASTENER=0.5, STAGGER=0.2;
 // ── DISASSEMBLY ──────────────────────────────────────────────────────────────
 function removeCam() {
   if(animRunning) return;
+  // Guard — parts may be null if compressed file renamed objects
+  if(!parts.cam || !parts.timingCover || !parts.pulleys || !parts.fasteners || !parts.waterPump) {
+    alert('Some parts were not found in the model. Check the green name list on screen.');
+    return;
+  }
   animRunning=true; lockUI();
   setStatus('Disassembling...');
 
@@ -669,6 +674,15 @@ btnInstall.addEventListener('click', installCam);
 
       scene.add(model);
       updateCamera();
+
+      // ── Dump all named objects to screen for debugging compressed file ──
+      const allNames = [];
+      model.traverse(c=>{ if(c.name) allNames.push(c.name); });
+      const nameBox = document.getElementById('_dbg') || document.createElement('div');
+      nameBox.id = '_dbg';
+      nameBox.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#001a00;color:#6eff6e;font-family:monospace;font-size:11px;padding:10px 12px;max-height:60vh;overflow-y:auto;border-bottom:2px solid #00ff00;white-space:pre-wrap;word-break:break-all';
+      nameBox.textContent = '📦 ALL OBJECT NAMES IN GLB (' + allNames.length + '):\n\n' + allNames.join('\n');
+      document.body.insertBefore(nameBox, document.body.firstChild);
 
       function findPart(name) {
         let found=null;
