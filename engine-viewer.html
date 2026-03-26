@@ -432,7 +432,7 @@ function swapCam(direction) {
 function doSwap(direction,newIndex) {
   const cam=parts.cam;
 
-  // Float position in parent-local space
+  // Float position in parent-local space — same coords cam is sitting at
   const floatX = camOrigin.x;
   const floatY = camOrigin.y;
   const floatZ = camOrigin.z + PULL_Z;
@@ -440,25 +440,32 @@ function doSwap(direction,newIndex) {
   const exitX  = floatX + FLOAT_X * direction;
   const enterX = floatX - FLOAT_X * direction;
 
-  // Clone outgoing cam — deep clone with own materials
+  // Get cam's actual world position and world scale so the clone
+  // renders correctly when placed at scene root (not model root)
+  const camWorldPos   = new THREE.Vector3();
+  const camWorldQuat  = new THREE.Quaternion();
+  const camWorldScale = new THREE.Vector3();
+  cam.matrixWorld.decompose(camWorldPos, camWorldQuat, camWorldScale);
+
+  // Clone outgoing cam — place it in world space so scale is correct
   const outgoing = cam.clone(true);
   outgoing.traverse(child=>{
     if(child.isMesh&&child.material) child.material=child.material.clone();
   });
-  // Place clone at exact float position with same orientation as cam
-  outgoing.position.set(floatX,floatY,floatZ);
-  outgoing.quaternion.copy(cam.quaternion);
+  outgoing.position.copy(camWorldPos);
+  outgoing.quaternion.copy(camWorldQuat);
+  outgoing.scale.copy(camWorldScale);
   scene.add(outgoing);
 
-  // Outgoing clone slides out and fades
-  tween(outgoing.position,{x:exitX,y:floatY,z:floatZ},T_CAM_FLOAT,0,null);
+  // Outgoing slides to exitX in world space and fades
+  tween(outgoing.position,{x:exitX,y:camWorldPos.y,z:camWorldPos.z},T_CAM_FLOAT,0,null);
   tweenOpacity(outgoing,1,0,T_CAM_FLOAT,0,()=>scene.remove(outgoing));
 
-  // Real cam enters from opposite side — same quaternion, no rotation changes
+  // Real cam enters from opposite side in parent-local space
   cam.position.set(enterX,floatY,floatZ);
   setOpacity(cam,0);
 
-  // Slide in and fade in simultaneously with outgoing
+  // Slide in and fade in simultaneously
   tween(cam.position,{x:floatX,y:floatY,z:floatZ},T_CAM_FLOAT,0,null);
   tweenOpacity(cam,0,1,T_CAM_FLOAT,0,()=>{
     camIndex=newIndex;
