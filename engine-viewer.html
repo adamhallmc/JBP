@@ -156,6 +156,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/meshoptimizer@0.18.1/meshopt_decoder.js"></script>
 <script>
 // ── EARLY ERROR CAPTURE — fires before anything else ─────────────────────────
 // Catches JS errors, promise rejections, and resource load failures.
@@ -639,6 +640,9 @@ btnInstall.addEventListener('click', installCam);
   const dracoLoader = new THREE.DRACOLoader();
   dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
   gltfLoader.setDRACOLoader(dracoLoader);
+  if (typeof MeshoptDecoder !== 'undefined') {
+    gltfLoader.setMeshoptDecoder(MeshoptDecoder);
+  }
   gltfLoader.load('6.2_cam_compressed.glb',
     gltf=>{
       const model=gltf.scene;
