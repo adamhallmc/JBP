@@ -495,6 +495,9 @@ let accessoryOrigins=[];
 // Header origins
 let hdrDriverOrigin, hdrPassOrigin, lthDriverOrigin, lthPassOrigin;
 
+// Tracks which headers are physically installed: 'stock' or 'lth'
+let installedHeaders = 'stock';
+
 // ── ANIMATION CONSTANTS ───────────────────────────────────────────────────────
 // Cam
 const CAM_PULL_Z  = 0.7;
@@ -508,8 +511,8 @@ const STAGGER     = 0.2;
 
 // Headers — tuned values, adjust after testing
 const HDR_SPREAD_X = 0.18;   // how far each header spreads on X
-const HDR_DROP_Z   = 0.15;   // how far headers drop on Z
-const HDR_FLY_Y    = 2.5;    // how far headers fly on Y to exit/enter
+const HDR_DROP_Z   = 0.15;   // how far headers drop on Z (Three.js Z = Blender Z)
+const HDR_FLY_Z    = 2.5;    // how far headers fly on THREE.js Z axis to exit/enter
 const T_HDR_REMOVE = 0.9;    // header removal slide duration
 const T_HDR_FLY    = 0.65;   // header swap fly duration
 const T_HDR_FADE   = 0.65;   // header swap fade duration
@@ -622,26 +625,44 @@ function removeHeaders(){
   animRunning=true; lockUI();
   setStatus('Removing headers...');
 
-  const hd=parts.hdrDriver, hp=parts.hdrPass;
-
-  // Driver side: increase X, decrease Z
-  // Pass side:   decrease X, decrease Z
-  tween(hd.position,{
-    x: hdrDriverOrigin.x + HDR_SPREAD_X,
-    y: hdrDriverOrigin.y,
-    z: hdrDriverOrigin.z - HDR_DROP_Z
-  }, T_HDR_REMOVE, 0, null);
-
-  tween(hp.position,{
-    x: hdrPassOrigin.x - HDR_SPREAD_X,
-    y: hdrPassOrigin.y,
-    z: hdrPassOrigin.z - HDR_DROP_Z
-  }, T_HDR_REMOVE, 0, ()=>{
-    setStatus('');
-    animRunning=false;
-    hdrIndex=0; updateHdrArrows();
-    showState('headers'); unlockHdrSelector();
-  });
+  if(installedHeaders === 'stock'){
+    const hd=parts.hdrDriver, hp=parts.hdrPass;
+    // Driver side: increase X, decrease Z (drop)
+    // Pass side:   decrease X, decrease Z (drop)
+    tween(hd.position,{
+      x: hdrDriverOrigin.x + HDR_SPREAD_X,
+      y: hdrDriverOrigin.y,
+      z: hdrDriverOrigin.z - HDR_DROP_Z
+    }, T_HDR_REMOVE, 0, null);
+    tween(hp.position,{
+      x: hdrPassOrigin.x - HDR_SPREAD_X,
+      y: hdrPassOrigin.y,
+      z: hdrPassOrigin.z - HDR_DROP_Z
+    }, T_HDR_REMOVE, 0, ()=>{
+      setStatus('');
+      animRunning=false;
+      hdrIndex=0; updateHdrArrows();
+      showState('headers'); unlockHdrSelector();
+    });
+  } else {
+    // LTH are installed — spread and drop them from their GLB origin
+    const lthD=parts.lthDriver, lthP=parts.lthPass;
+    tween(lthD.position,{
+      x: lthDriverOrigin.x + HDR_SPREAD_X,
+      y: lthDriverOrigin.y,
+      z: lthDriverOrigin.z - HDR_DROP_Z
+    }, T_HDR_REMOVE, 0, null);
+    tween(lthP.position,{
+      x: lthPassOrigin.x - HDR_SPREAD_X,
+      y: lthPassOrigin.y,
+      z: lthPassOrigin.z - HDR_DROP_Z
+    }, T_HDR_REMOVE, 0, ()=>{
+      setStatus('');
+      animRunning=false;
+      hdrIndex=1; updateHdrArrows();
+      showState('headers'); unlockHdrSelector();
+    });
+  }
 }
 
 // ── HEADER SWAP ───────────────────────────────────────────────────────────────
@@ -654,40 +675,42 @@ function swapHeaders(direction){
   const hd=parts.hdrDriver, hp=parts.hdrPass;
   const lthD=parts.lthDriver, lthP=parts.lthPass;
 
-  // Current float positions
-  const hdFloatX  = hdrDriverOrigin.x + HDR_SPREAD_X;
-  const hdFloatY  = hdrDriverOrigin.y;
-  const hdFloatZ  = hdrDriverOrigin.z - HDR_DROP_Z;
-  const hpFloatX  = hdrPassOrigin.x - HDR_SPREAD_X;
-  const hpFloatY  = hdrPassOrigin.y;
-  const hpFloatZ  = hdrPassOrigin.z - HDR_DROP_Z;
+  // Stock float positions (spread + dropped from origin)
+  const hdFloatX = hdrDriverOrigin.x + HDR_SPREAD_X;
+  const hdFloatY = hdrDriverOrigin.y;
+  const hdFloatZ = hdrDriverOrigin.z - HDR_DROP_Z;
+  const hpFloatX = hdrPassOrigin.x - HDR_SPREAD_X;
+  const hpFloatY = hdrPassOrigin.y;
+  const hpFloatZ = hdrPassOrigin.z - HDR_DROP_Z;
 
-  // LTH pre-offset: same X spread and Z drop, but offset several feet on Y below
-  const lthDFloatX = hdFloatX;
-  const lthDFloatZ = hdFloatZ;
-  const lthPFloatX = hpFloatX;
-  const lthPFloatZ = hpFloatZ;
+  // LTH float positions — same X spread and Z drop applied to LTH origins
+  const lthDFloatX = lthDriverOrigin.x + HDR_SPREAD_X;
+  const lthDFloatY = lthDriverOrigin.y;
+  const lthDFloatZ = lthDriverOrigin.z - HDR_DROP_Z;
+  const lthPFloatX = lthPassOrigin.x - HDR_SPREAD_X;
+  const lthPFloatY = lthPassOrigin.y;
+  const lthPFloatZ = lthPassOrigin.z - HDR_DROP_Z;
 
   if(direction > 0){
     // Stock → Long Tubes
-    // Stock headers fly up on Y and fade out
-    tween(hd.position,{x:hdFloatX, y:hdFloatY+HDR_FLY_Y, z:hdFloatZ}, T_HDR_FLY, 0, null);
+    // Stock headers fly up on Z and fade out
+    tween(hd.position,{x:hdFloatX, y:hdFloatY, z:hdFloatZ+HDR_FLY_Z}, T_HDR_FLY, 0, null);
     tweenOpacity(hd,1,0,T_HDR_FADE,0,null);
-    tween(hp.position,{x:hpFloatX, y:hpFloatY+HDR_FLY_Y, z:hpFloatZ}, T_HDR_FLY, 0, null);
+    tween(hp.position,{x:hpFloatX, y:hpFloatY, z:hpFloatZ+HDR_FLY_Z}, T_HDR_FLY, 0, null);
     tweenOpacity(hp,1,0,T_HDR_FADE,0,()=>{
       setVisible(hd,false); setVisible(hp,false);
 
-      // LTH appear below and slide up to float position
+      // LTH appear below (negative Z) at their float positions and rise up
       setVisible(lthD,true);
-      lthD.position.set(lthDFloatX, hdFloatY - HDR_FLY_Y, lthDFloatZ);
+      lthD.position.set(lthDFloatX, lthDFloatY, lthDFloatZ - HDR_FLY_Z);
       setOpacity(lthD,0);
       setVisible(lthP,true);
-      lthP.position.set(lthPFloatX, hpFloatY - HDR_FLY_Y, lthPFloatZ);
+      lthP.position.set(lthPFloatX, lthPFloatY, lthPFloatZ - HDR_FLY_Z);
       setOpacity(lthP,0);
 
-      tween(lthD.position,{x:lthDFloatX, y:hdFloatY, z:lthDFloatZ}, T_HDR_FLY, 0, null);
+      tween(lthD.position,{x:lthDFloatX, y:lthDFloatY, z:lthDFloatZ}, T_HDR_FLY, 0, null);
       tweenOpacity(lthD,0,1,T_HDR_FADE,0,null);
-      tween(lthP.position,{x:lthPFloatX, y:hpFloatY, z:lthPFloatZ}, T_HDR_FLY, 0, null);
+      tween(lthP.position,{x:lthPFloatX, y:lthPFloatY, z:lthPFloatZ}, T_HDR_FLY, 0, null);
       tweenOpacity(lthP,0,1,T_HDR_FADE,0,()=>{
         hdrIndex=newIndex; hdrNameDisp.textContent=HDR_LIST[hdrIndex];
         animRunning=false; unlockHdrSelector();
@@ -695,19 +718,19 @@ function swapHeaders(direction){
     });
   } else {
     // Long Tubes → Stock
-    // LTH fly down on Y and fade out
-    tween(lthD.position,{x:lthDFloatX, y:hdFloatY-HDR_FLY_Y, z:lthDFloatZ}, T_HDR_FLY, 0, null);
+    // LTH fly down on Z and fade out
+    tween(lthD.position,{x:lthDFloatX, y:lthDFloatY, z:lthDFloatZ-HDR_FLY_Z}, T_HDR_FLY, 0, null);
     tweenOpacity(lthD,1,0,T_HDR_FADE,0,null);
-    tween(lthP.position,{x:lthPFloatX, y:hpFloatY-HDR_FLY_Y, z:lthPFloatZ}, T_HDR_FLY, 0, null);
+    tween(lthP.position,{x:lthPFloatX, y:lthPFloatY, z:lthPFloatZ-HDR_FLY_Z}, T_HDR_FLY, 0, null);
     tweenOpacity(lthP,1,0,T_HDR_FADE,0,()=>{
       setVisible(lthD,false); setVisible(lthP,false);
 
-      // Stock headers come back down from above
+      // Stock headers come in from above on Z
       setVisible(hd,true);
-      hd.position.set(hdFloatX, hdFloatY+HDR_FLY_Y, hdFloatZ);
+      hd.position.set(hdFloatX, hdFloatY, hdFloatZ+HDR_FLY_Z);
       setOpacity(hd,0);
       setVisible(hp,true);
-      hp.position.set(hpFloatX, hpFloatY+HDR_FLY_Y, hpFloatZ);
+      hp.position.set(hpFloatX, hpFloatY, hpFloatZ+HDR_FLY_Z);
       setOpacity(hp,0);
 
       tween(hd.position,{x:hdFloatX, y:hdFloatY, z:hdFloatZ}, T_HDR_FLY, 0, null);
@@ -728,18 +751,30 @@ function installHeaders(){
   setStatus('Installing '+HDR_LIST[hdrIndex]+'...');
 
   if(hdrIndex===0){
-    // Install stock — reverse the spread and drop
+    // Installing stock headers
     const hd=parts.hdrDriver, hp=parts.hdrPass;
     tween(hd.position,{x:hdrDriverOrigin.x, y:hdrDriverOrigin.y, z:hdrDriverOrigin.z}, T_HDR_REMOVE, 0, null);
     tween(hp.position,{x:hdrPassOrigin.x,   y:hdrPassOrigin.y,   z:hdrPassOrigin.z},   T_HDR_REMOVE, 0, ()=>{
+      // Silently reset LTH back to their GLB origins and hide them
+      if(parts.lthDriver){ parts.lthDriver.position.copy(lthDriverOrigin); setVisible(parts.lthDriver,false); restoreOpaque(parts.lthDriver); }
+      if(parts.lthPass)  { parts.lthPass.position.copy(lthPassOrigin);     setVisible(parts.lthPass,false);   restoreOpaque(parts.lthPass); }
+      // Make sure stock headers are visible and opaque
+      restoreOpaque(hd); restoreOpaque(hp);
+      installedHeaders = 'stock';
       setStatus(''); animRunning=false;
       showState('home'); unlockHome();
     });
   } else {
-    // Install LTH — slide from float position to GLB origin
+    // Installing LTH
     const lthD=parts.lthDriver, lthP=parts.lthPass;
     tween(lthD.position,{x:lthDriverOrigin.x, y:lthDriverOrigin.y, z:lthDriverOrigin.z}, T_HDR_REMOVE, 0, null);
     tween(lthP.position,{x:lthPassOrigin.x,   y:lthPassOrigin.y,   z:lthPassOrigin.z},   T_HDR_REMOVE, 0, ()=>{
+      // Silently reset stock headers back to their GLB origins and hide them
+      if(parts.hdrDriver){ parts.hdrDriver.position.copy(hdrDriverOrigin); setVisible(parts.hdrDriver,false); restoreOpaque(parts.hdrDriver); }
+      if(parts.hdrPass)  { parts.hdrPass.position.copy(hdrPassOrigin);     setVisible(parts.hdrPass,false);   restoreOpaque(parts.hdrPass); }
+      // Make sure LTH are visible and opaque
+      restoreOpaque(lthD); restoreOpaque(lthP);
+      installedHeaders = 'lth';
       setStatus(''); animRunning=false;
       showState('home'); unlockHome();
     });
@@ -830,9 +865,12 @@ btnInstallHdr.addEventListener('click', installHeaders);
       if(parts.lthDriver) lthDriverOrigin = parts.lthDriver.position.clone();
       if(parts.lthPass)   lthPassOrigin   = parts.lthPass.position.clone();
 
-      // Hide LTH on load
+      // Hide LTH on load — stock headers installed by default
       if(parts.lthDriver) setVisible(parts.lthDriver, false);
       if(parts.lthPass)   setVisible(parts.lthPass, false);
+      if(parts.hdrDriver) { setVisible(parts.hdrDriver, true); restoreOpaque(parts.hdrDriver); }
+      if(parts.hdrPass)   { setVisible(parts.hdrPass,   true); restoreOpaque(parts.hdrPass); }
+      installedHeaders = 'stock';
 
       // Enable buttons based on what was found
       const camOk = parts.cam && parts.timingCover;
